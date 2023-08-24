@@ -14,21 +14,26 @@ tab1, tab2 = st.tabs(["Curva de Aprendizaje", "Monte Carlo"])
 
 with tab1:
     st.header("Curva de Aprendizaje")
+   
+    cantidad_unidades = st.text_input("Cantidad de Unidades")
+    nivel_curva = st.text_input("Tasa de mejora (%)")
+    tiempo_primera_unidad = st.text_input("Tiempo para terminar primera unidad")
+    unidad_de_tiempo = st.text_input("Unidad de tiempo")
 
-    cantidad_unidades = st.number_input("Cantidad de Unidades")
-    nivel_curva = st.number_input("Tasa de mejora")
-    tiempo_primera_unidad = st.number_input("Tiempo para terminar primera unidad")
     tipo_curva = st.radio("Tipo de valores", 
                           ("Unidades", "Acumulativos"))
     
-    if (cantidad_unidades > 0 and nivel_curva > 0 and tiempo_primera_unidad > 0):
+    if (cantidad_unidades.isdigit() and int(cantidad_unidades) > 0 and nivel_curva.replace(".", "").isnumeric() and float(nivel_curva) > 0  and tiempo_primera_unidad.isdigit() and float(tiempo_primera_unidad) > 0 ):
+        nivel_curva = float(nivel_curva) / 100
+        tiempo_primera_unidad = float(tiempo_primera_unidad)
+        cantidad_unidades = float(cantidad_unidades)
         tiempo_por_unidad = np.zeros(int(cantidad_unidades))
         tiempo_por_unidad[0] = tiempo_primera_unidad
         for i in range(1,len(tiempo_por_unidad)):
             if tipo_curva == 'Unidades':
-                tiempo_por_unidad[i] = round(tiempo_primera_unidad * (i + 1) ** (np.log(nivel_curva) / np.log(2)), 2)
+                tiempo_por_unidad[i] = round(tiempo_primera_unidad * (i + 1) ** (np.log(nivel_curva) / np.log(2)), 4)
             else:
-                tiempo_por_unidad[i] = round(tiempo_primera_unidad * (i + 1) ** (np.log(nivel_curva) / np.log(2)) + tiempo_por_unidad[i - 1], 2)
+                tiempo_por_unidad[i] = round(tiempo_primera_unidad * (i + 1) ** (np.log(nivel_curva) / np.log(2)) + tiempo_por_unidad[i - 1], 4)
 
         x = np.arange(0,len(tiempo_por_unidad),1)
 
@@ -38,7 +43,7 @@ with tab1:
         arrFinal = np.array([unidades, tiempo_por_unidad]).transpose()
         df = pd.DataFrame(
             arrFinal,
-            columns=('Unidades', 'Horas')
+            columns=('Unidades', unidad_de_tiempo)
             )
 
         with grafico:
@@ -50,8 +55,8 @@ with tab1:
             # st.pyplot(fig, use_container_width=True)
             charts_df = df
             charts_df.index = np.arange(1, len(charts_df) + 1)
-            st.line_chart(charts_df, x="Unidades", y="Horas")
-            st.bar_chart(charts_df, x="Unidades", y="Horas")
+            st.line_chart(charts_df, x="Unidades", y=unidad_de_tiempo)
+            st.bar_chart(charts_df, x="Unidades", y=unidad_de_tiempo)
         
         with tabla:
             N = 5
@@ -63,14 +68,14 @@ with tab1:
             
             #st.dataframe(df.set_index(df.columns[0]), height=(len(unidades) + 1) * 35 + 3)
             prev, _, next = st.columns([1, 10, 1])
-            st.write(st.session_state.page_number)
-            if next.button("Next"):
+            st.write(f"Mostrando 5 de {int(cantidad_unidades)}")
+            if next.button("siguiente"):
                 if st.session_state.page_number + 1 > last_page:
                      st.session_state.page_number = 0
                 else:
                     st.session_state.page_number += 1
 
-            if prev.button("Previous"):
+            if prev.button("Anterior"):
                 if st.session_state.page_number - 1 < 0:
                     st.session_state.page_number = last_page
                 else:
@@ -82,24 +87,30 @@ with tab1:
 
             # Index into the sub dataframe
             sub_df = df.iloc[start_idx:end_idx]
-            st.write(sub_df)
+            col1, col2, col3 = st.columns([5, 2, 5])
+            with col2:
+                st.write(sub_df)
+                    
 
 with tab2:
     st.header("Monte Carlo")
 
-    tasa = st.number_input("Tasa")
-    iteraciones = st.number_input("Iteraciones")
+    tasa = st.text_input("Tasa")
+    iteraciones = st.text_input("Iteraciones")
 
     df = pd.DataFrame(np.zeros(3).reshape(1,3), columns=('anios', 'Flujos', 'STDEV'))
     table = st.data_editor(df, num_rows="dynamic")
 
     boton = st.button("Simular")
-    if boton:
+    if boton and tasa.replace(".", "").isnumeric() and float(tasa) > 0 and iteraciones.isdigit() and int(iteraciones) > 0:
+        tasa = float(tasa) / 100
+        print(tasa)
+        iteraciones = int(iteraciones)
         medias = table['Flujos'][1:len(table['Flujos'])]
 
         stedv = table['STDEV'][1:len(table['STDEV'])]
 
-        vpn_fijo = npf.npv(int(tasa) / 100, np.array(table['Flujos']))
+        vpn_fijo = npf.npv(tasa, np.array(table['Flujos']))
 
         vpns =[]
         flujo_actual = []
@@ -111,7 +122,7 @@ with tab2:
                 flujo_actual.append(np.random.normal(medias[i], stedv[i]))
 
             #vpn aleatorio
-            vpns.append(npf.npv(tasa / 100, flujo_actual))
+            vpns.append(npf.npv(tasa, flujo_actual))
 
         
         uno, dos = st.columns([6,6])
